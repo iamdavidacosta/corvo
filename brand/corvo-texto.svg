@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="650" height="280" viewBox="0 0 650 280">
+  <defs>
+    <filter id="neonGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <g transform="translate(-690,-70)">
+    <g id="wordmark" transform="translate(705,80)" fill="none" stroke="#ffffff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 82 5 H 22 Q 5 5 5 22 V 93 Q 5 110 22 110 H 82"/>
+      <rect x="133" y="40" width="91" height="70" rx="18" ry="18"/>
+      <path d="M 278 110 V 57 Q 278 40 295 40 H 346"/>
+      <path d="M 380 40 L 427 110 L 474 40"/>
+      <rect x="506" y="40" width="91" height="70" rx="18" ry="18"/>
+    </g>
+    <path d="M 729 100 L 753 126 L 729 126 Z" fill="#07d8ff" filter="url(#neonGlow)"/>
+    <text x="705" y="286" fill="#8c929a" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" letter-spacing="6" textLength="540" lengthAdjust="spacingAndGlyphs">CONTROL TOTAL DE TUS FINANZAS</text>
+    <path d="M 880 331 C 917 331, 954 331, 992 331 S 1062 331, 1083 331" stroke="#07d8ff" stroke-width="3.5" stroke-linecap="round" fill="none" filter="url(#neonGlow)"/>
+  </g>
+</svg>

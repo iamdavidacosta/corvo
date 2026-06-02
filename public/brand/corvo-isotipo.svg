@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="370" viewBox="0 0 620 370">
+  <defs>
+    <linearGradient id="birdGrad" x1="60" y1="52" x2="734" y2="452" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#20242b"/>
+      <stop offset="48%" stop-color="#323844"/>
+      <stop offset="100%" stop-color="#4a4f58"/>
+    </linearGradient>
+    <filter id="neonGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <g id="bird" transform="translate(-46,-45) translate(5,10) scale(0.86)">
+    <path d="M 501.00,225.00 L 615.00,227.00 L 652.00,232.00 L 692.00,242.00 L 733.00,261.00 L 734.00,255.00 L 723.00,229.00 L 700.00,205.00 L 659.00,176.00 L 611.00,152.00 L 574.00,180.00 Z" fill="url(#birdGrad)" fill-rule="evenodd"/>
+    <path d="M 616.00,142.00 L 592.00,117.00 L 558.00,91.00 L 510.00,67.00 L 471.00,56.00 L 443.00,52.00 L 387.00,53.00 L 340.00,63.00 L 296.00,83.00 L 264.00,105.00 L 225.00,142.00 L 174.00,209.00 L 177.00,210.00 L 243.00,187.00 L 257.00,184.00 L 259.00,186.00 L 204.00,247.00 L 150.00,316.00 L 60.00,447.00 L 60.00,452.00 L 155.00,432.00 L 241.00,420.00 L 300.00,353.00 L 357.00,300.00 L 412.00,256.00 L 447.00,232.00 L 516.00,192.00 L 470.00,195.00 L 459.00,191.00 L 417.00,143.00 L 374.00,123.00 L 376.00,121.00 L 421.00,120.00 L 469.00,127.00 L 505.00,137.00 L 554.00,157.00 L 585.00,154.00 L 612.00,146.00 Z" fill="url(#birdGrad)" fill-rule="evenodd"/>
+    <path d="M 465.00,145.00 L 477.00,160.00 L 477.00,162.00 L 482.00,167.00 L 490.00,171.00 L 506.00,171.00 L 510.00,169.00 L 530.00,168.00 L 509.00,158.00 L 493.00,153.00 L 489.00,150.00 L 477.00,148.00 L 475.00,146.00 L 473.00,147.00 Z" fill="#07d8ff" filter="url(#neonGlow)"/>
+  </g>
+</svg>
