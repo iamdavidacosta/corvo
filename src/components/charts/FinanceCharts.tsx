@@ -26,10 +26,10 @@ export function CategoryChart({ items }: { items: FinancialItem[] }) {
   );
 }
 
-export function IncomeDebtChart({ currentIncome, expectedIncome, debtTotal }: { currentIncome: number; expectedIncome: number; debtTotal: number }) {
+export function IncomeDebtChart({ currentIncome, expectedIncome, committedTotal }: { currentIncome: number; expectedIncome: number; committedTotal: number }) {
   const data = [
-    { name: 'Actual', ingresos: currentIncome, deudas: debtTotal },
-    { name: 'Esperado', ingresos: expectedIncome, deudas: debtTotal },
+    { name: 'Recibidos', ingresos: currentIncome, compromisos: committedTotal },
+    { name: 'Por recibir', ingresos: expectedIncome, compromisos: committedTotal },
   ];
 
   return (
@@ -41,7 +41,7 @@ export function IncomeDebtChart({ currentIncome, expectedIncome, debtTotal }: { 
           <Tooltip formatter={(value) => formatCurrency(Number(value))} contentStyle={tooltipStyle} />
           <Legend />
           <Bar dataKey="ingresos" fill="#00E5FF" radius={[5, 5, 0, 0]} />
-          <Bar dataKey="deudas" fill="#94A3B8" radius={[5, 5, 0, 0]} />
+          <Bar dataKey="compromisos" fill="#94A3B8" radius={[5, 5, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>

@@ -1,10 +1,10 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { addMonths, endOfMonth, format, parseISO, startOfMonth } from 'date-fns';
+﻿import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { addDays, format, parseISO } from 'date-fns';
 import { supabase } from '../lib/supabase';
-import { belongsToMonth, nextDueDate } from '../lib/dates';
-import { buildDemoCards, buildDemoIncomes, buildDemoItems, defaultCategories } from '../lib/demoData';
-import type { Category, CreditCard, FinanceData, FinancialItem, IncomeSource, MonthlySetting, Payment } from '../types';
-import type { CreditCardFormValues, FinancialItemFormValues, IncomeFormValues, MonthlySettingFormValues } from '../lib/validations';
+import { belongsToPeriod, nextDueDate, salaryCycleForMonth } from '../lib/dates';
+import { buildDemoCards, buildDemoIncomes, buildDemoItems, buildDemoPockets, defaultCategories } from '../lib/demoData';
+import type { BudgetPocket, Category, CreditCard, FinanceData, FinancialItem, IncomeSource, MonthlySetting, Payment } from '../types';
+import type { BudgetPocketFormValues, CategoryFormValues, CreditCardFormValues, FinancialItemFormValues, IncomeFormValues, MonthlySettingFormValues } from '../lib/validations';
 import { useAuth } from '../features/auth/AuthProvider';
 
 type FinanceContextValue = FinanceData & {
@@ -14,6 +14,8 @@ type FinanceContextValue = FinanceData & {
   saveFinancialItem: (values: FinancialItemFormValues, id?: string) => Promise<void>;
   deleteFinancialItem: (id: string) => Promise<void>;
   markFinancialItemPaid: (item: FinancialItem) => Promise<void>;
+  saveBudgetPocket: (values: BudgetPocketFormValues, id?: string) => Promise<void>;
+  deleteBudgetPocket: (id: string) => Promise<void>;
   saveIncome: (values: IncomeFormValues, id?: string) => Promise<void>;
   deleteIncome: (id: string) => Promise<void>;
   saveCreditCard: (values: CreditCardFormValues, id?: string) => Promise<void>;
@@ -21,6 +23,8 @@ type FinanceContextValue = FinanceData & {
   saveMonthlySetting: (values: MonthlySettingFormValues) => Promise<void>;
   revertPayment: (payment: Payment) => Promise<void>;
   createDefaultCategories: () => Promise<Category[]>;
+  saveCategory: (values: CategoryFormValues) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
   loadDemoData: () => Promise<void>;
 };
 
@@ -29,47 +33,69 @@ const FinanceContext = createContext<FinanceContextValue | null>(null);
 const emptyData: FinanceData = {
   categories: [],
   items: [],
+  pockets: [],
   incomes: [],
   cards: [],
   payments: [],
   monthlySetting: null,
+  periodStart: '',
+  periodEnd: '',
+  nextPaymentDate: '',
 };
 
 export function FinanceProvider({ selectedMonth, children }: { selectedMonth: string; children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { profile, user } = useAuth();
   const [data, setData] = useState<FinanceData>(emptyData);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const monthStart = format(startOfMonth(parseISO(selectedMonth)), 'yyyy-MM-dd');
-    const nextMonthStart = format(startOfMonth(addMonths(parseISO(selectedMonth), 1)), 'yyyy-MM-dd');
-    const monthEnd = format(endOfMonth(parseISO(selectedMonth)), 'yyyy-MM-dd');
+    const salaryCycleDay = profile?.salary_cycle_day ?? 1;
+    const adjustToBusinessDay = profile?.salary_adjusts_to_business_day ?? true;
+    const { periodStart, periodEnd, nextPaymentDate } = salaryCycleForMonth(selectedMonth, salaryCycleDay, adjustToBusinessDay);
+    const periodEndExclusive = format(addDays(parseISO(periodEnd), 1), 'yyyy-MM-dd');
+    const periodAnchors = Array.from(new Set([periodStart, selectedMonth]));
 
-    const [categoriesRes, itemsRes, incomesRes, cardsRes, paymentsRes, settingsRes] = await Promise.all([
+    const [categoriesRes, itemsRes, pocketsRes, incomesRes, cardsRes, paymentsRes, settingsRes] = await Promise.all([
       supabase.from('categories').select('*').eq('user_id', user.id).order('name'),
-      supabase.from('financial_items').select('*, categories(*)').eq('user_id', user.id).gte('due_date', monthStart).lte('due_date', monthEnd).order('due_date'),
+      supabase.from('financial_items').select('*, categories(*)').eq('user_id', user.id).gte('due_date', periodStart).lte('due_date', periodEnd).order('due_date'),
+      supabase.from('budget_pockets').select('*, categories(*)').eq('user_id', user.id).in('month', periodAnchors).order('name'),
       supabase.from('income_sources').select('*').eq('user_id', user.id).eq('is_active', true).order('name'),
       supabase.from('credit_cards').select('*').eq('user_id', user.id).order('payment_date', { nullsFirst: false }),
-      supabase.from('payments').select('*, financial_items(*, categories(*))').eq('user_id', user.id).gte('paid_at', monthStart).lt('paid_at', nextMonthStart).order('paid_at', { ascending: false }),
-      supabase.from('monthly_settings').select('*').eq('user_id', user.id).eq('month', monthStart).maybeSingle(),
+      supabase.from('payments').select('*, financial_items(*, categories(*))').eq('user_id', user.id).gte('paid_at', periodStart).lt('paid_at', periodEndExclusive).order('paid_at', { ascending: false }),
+      supabase.from('monthly_settings').select('*').eq('user_id', user.id).in('month', periodAnchors),
     ]);
 
-    const firstError = [categoriesRes, itemsRes, incomesRes, cardsRes, paymentsRes, settingsRes].find((result) => result.error)?.error;
+    const firstError = [categoriesRes, itemsRes, pocketsRes, incomesRes, cardsRes, paymentsRes, settingsRes].find((result) => result.error)?.error;
     if (firstError) throw firstError;
 
-    const incomes = ((incomesRes.data ?? []) as IncomeSource[]).filter((income) => income.frequency === 'monthly' || !income.month || belongsToMonth(income.month, selectedMonth));
+    const settings = ((settingsRes.data ?? []) as MonthlySetting[]).find((setting) => setting.month === periodStart) ?? ((settingsRes.data ?? []) as MonthlySetting[])[0] ?? null;
+    const pockets = ((pocketsRes.data ?? []) as BudgetPocket[]).reduce<BudgetPocket[]>((acc, pocket) => {
+      const existingIndex = acc.findIndex((item) => item.name === pocket.name);
+      if (existingIndex === -1) return [...acc, pocket];
+      if (pocket.month === periodStart) {
+        const next = [...acc];
+        next[existingIndex] = pocket;
+        return next;
+      }
+      return acc;
+    }, []);
+    const incomes = ((incomesRes.data ?? []) as IncomeSource[]).filter((income) => income.frequency === 'monthly' || !income.month || belongsToPeriod(income.month, periodStart, periodEnd));
     setData({
       categories: (categoriesRes.data ?? []) as Category[],
       items: (itemsRes.data ?? []) as FinancialItem[],
+      pockets,
       incomes,
       cards: (cardsRes.data ?? []) as CreditCard[],
       payments: (paymentsRes.data ?? []) as Payment[],
-      monthlySetting: (settingsRes.data ?? null) as MonthlySetting | null,
+      monthlySetting: settings,
+      periodStart,
+      periodEnd,
+      nextPaymentDate,
     });
     setLoading(false);
-  }, [selectedMonth, user]);
+  }, [profile?.salary_adjusts_to_business_day, profile?.salary_cycle_day, selectedMonth, user]);
 
   useEffect(() => {
     void refresh().catch(() => setLoading(false));
@@ -83,6 +109,35 @@ export function FinanceProvider({ selectedMonth, children }: { selectedMonth: st
     await refresh();
     return inserted as Category[];
   }, [refresh, user]);
+
+  const saveCategory = useCallback(
+    async (values: CategoryFormValues) => {
+      if (!user) return;
+      const { error } = await supabase.from('categories').upsert(
+        {
+          user_id: user.id,
+          name: values.name,
+          type: values.type || 'fixed',
+          color: values.color || '#00E5FF',
+          icon: values.icon || 'receipt',
+        },
+        { onConflict: 'user_id,name' },
+      );
+      if (error) throw error;
+      await refresh();
+    },
+    [refresh, user],
+  );
+
+  const deleteCategory = useCallback(
+    async (id: string) => {
+      if (!user) return;
+      const { error } = await supabase.from('categories').delete().eq('id', id).eq('user_id', user.id);
+      if (error) throw error;
+      await refresh();
+    },
+    [refresh, user],
+  );
 
   const saveFinancialItem = useCallback(
     async (values: FinancialItemFormValues, id?: string) => {
@@ -99,6 +154,34 @@ export function FinanceProvider({ selectedMonth, children }: { selectedMonth: st
     async (id: string) => {
       if (!user) return;
       const { error } = await supabase.from('financial_items').delete().eq('id', id).eq('user_id', user.id);
+      if (error) throw error;
+      await refresh();
+    },
+    [refresh, user],
+  );
+
+  const saveBudgetPocket = useCallback(
+    async (values: BudgetPocketFormValues, id?: string) => {
+      if (!user) return;
+      const payload = {
+        ...values,
+        category_id: values.category_id || null,
+        month: values.month || data.periodStart || selectedMonth,
+        notes: values.notes || null,
+        user_id: user.id,
+        updated_at: new Date().toISOString(),
+      };
+      const { error } = id ? await supabase.from('budget_pockets').update(payload).eq('id', id).eq('user_id', user.id) : await supabase.from('budget_pockets').insert(payload);
+      if (error) throw error;
+      await refresh();
+    },
+    [data.periodStart, refresh, selectedMonth, user],
+  );
+
+  const deleteBudgetPocket = useCallback(
+    async (id: string) => {
+      if (!user) return;
+      const { error } = await supabase.from('budget_pockets').delete().eq('id', id).eq('user_id', user.id);
       if (error) throw error;
       await refresh();
     },
@@ -133,12 +216,12 @@ export function FinanceProvider({ selectedMonth, children }: { selectedMonth: st
   const saveIncome = useCallback(
     async (values: IncomeFormValues, id?: string) => {
       if (!user) return;
-      const payload = { ...values, month: values.month || selectedMonth, user_id: user.id, updated_at: new Date().toISOString() };
+      const payload = { ...values, month: values.month || data.periodStart || selectedMonth, user_id: user.id, updated_at: new Date().toISOString() };
       const { error } = id ? await supabase.from('income_sources').update(payload).eq('id', id).eq('user_id', user.id) : await supabase.from('income_sources').insert(payload);
       if (error) throw error;
       await refresh();
     },
-    [refresh, selectedMonth, user],
+    [data.periodStart, refresh, selectedMonth, user],
   );
 
   const deleteIncome = useCallback(
@@ -178,7 +261,7 @@ export function FinanceProvider({ selectedMonth, children }: { selectedMonth: st
       const { error } = await supabase.from('monthly_settings').upsert(
         {
           user_id: user.id,
-          month: selectedMonth,
+          month: data.periodStart || selectedMonth,
           daily_designated_money: values.daily_designated_money,
           notes: values.notes || null,
           updated_at: new Date().toISOString(),
@@ -188,7 +271,7 @@ export function FinanceProvider({ selectedMonth, children }: { selectedMonth: st
       if (error) throw error;
       await refresh();
     },
-    [refresh, selectedMonth, user],
+    [data.periodStart, refresh, selectedMonth, user],
   );
 
   const revertPayment = useCallback(
@@ -214,6 +297,7 @@ export function FinanceProvider({ selectedMonth, children }: { selectedMonth: st
     await supabase.from('notification_logs').delete().eq('user_id', user.id);
     await supabase.from('payments').delete().eq('user_id', user.id);
     await supabase.from('financial_items').delete().eq('user_id', user.id);
+    await supabase.from('budget_pockets').delete().eq('user_id', user.id);
     await supabase.from('income_sources').delete().eq('user_id', user.id);
     await supabase.from('credit_cards').delete().eq('user_id', user.id);
     await supabase.from('monthly_settings').delete().eq('user_id', user.id);
@@ -227,19 +311,20 @@ export function FinanceProvider({ selectedMonth, children }: { selectedMonth: st
 
     await Promise.all([
       supabase.from('financial_items').insert(buildDemoItems(user.id, categories as Category[], selectedMonth)),
-      supabase.from('income_sources').insert(buildDemoIncomes(user.id, selectedMonth)),
+      supabase.from('budget_pockets').insert(buildDemoPockets(user.id, categories as Category[], data.periodStart || selectedMonth)),
+      supabase.from('income_sources').insert(buildDemoIncomes(user.id, data.periodStart || selectedMonth)),
       supabase.from('credit_cards').insert(buildDemoCards(user.id, selectedMonth)),
       supabase
         .from('monthly_settings')
         .insert({
           user_id: user.id,
-          month: selectedMonth,
+          month: data.periodStart || selectedMonth,
           daily_designated_money: 0,
           notes: 'Ahorro esperado de la hoja: $2.000.000. No se registra como ingreso porque representa saldo sobrante.',
         }),
     ]);
     await refresh();
-  }, [refresh, selectedMonth, user]);
+  }, [data.periodStart, refresh, selectedMonth, user]);
 
   const value = useMemo<FinanceContextValue>(
     () => ({
@@ -250,14 +335,18 @@ export function FinanceProvider({ selectedMonth, children }: { selectedMonth: st
       saveFinancialItem,
       deleteFinancialItem,
       markFinancialItemPaid,
+      saveBudgetPocket,
+      deleteBudgetPocket,
       saveIncome,
       deleteIncome,
       saveCreditCard,
       deleteCreditCard,
       saveMonthlySetting,
-      revertPayment,
-      createDefaultCategories,
-      loadDemoData,
+        revertPayment,
+        createDefaultCategories,
+        saveCategory,
+        deleteCategory,
+        loadDemoData,
     }),
     [
       data,
@@ -267,14 +356,18 @@ export function FinanceProvider({ selectedMonth, children }: { selectedMonth: st
       saveFinancialItem,
       deleteFinancialItem,
       markFinancialItemPaid,
+      saveBudgetPocket,
+      deleteBudgetPocket,
       saveIncome,
       deleteIncome,
       saveCreditCard,
       deleteCreditCard,
       saveMonthlySetting,
-      revertPayment,
-      createDefaultCategories,
-      loadDemoData,
+        revertPayment,
+        createDefaultCategories,
+        saveCategory,
+        deleteCategory,
+        loadDemoData,
     ],
   );
 
@@ -286,3 +379,4 @@ export function useFinance() {
   if (!value) throw new Error('useFinance debe usarse dentro de FinanceProvider');
   return value;
 }
+

@@ -31,14 +31,15 @@ const subscriptions = [
 
 const taxes = [['Salud Premium', 53100, 1, true]] as const;
 
-const fixedCosts = [
-  ['Arriendo', 1370000, 1, false],
-  ['Salidas/Otros', 1500000, 1, false],
-  ['Mercado', 600000, 1, false],
-  ['Proteína', 175000, 1, false],
-  ['Complemento Almuerzo', 300000, 1, false],
-  ['Mesada', 1000000, 1, false],
-  ['Fondo Imprevistos', 113950, 1, false],
+const fixedCosts = [['Arriendo', 1370000, 1, false]] as const;
+
+const pockets = [
+  ['Salidas/Otros', 1500000],
+  ['Mercado', 600000],
+  ['Proteína', 175000],
+  ['Complemento Almuerzo', 300000],
+  ['Mesada', 1000000],
+  ['Fondo Imprevistos', 113950],
 ] as const;
 
 type DemoItem = readonly [description: string, amount: number, dueDay: number, hadDateInSheet: boolean];
@@ -67,6 +68,20 @@ export function buildDemoItems(userId: string, categories: Category[], selectedM
     ...taxes.map((row) => item(row, 'Impuestos')),
     ...fixedCosts.map((row) => item(row, 'Constantes')),
   ];
+}
+
+export function buildDemoPockets(userId: string, categories: Category[], selectedMonth = monthISO()) {
+  const byName = new Map(categories.map((category) => [category.name, category.id]));
+  return pockets.map(([name, allocated_amount]) => ({
+    user_id: userId,
+    category_id: byName.get('Constantes'),
+    name,
+    allocated_amount,
+    spent_amount: 0,
+    month: selectedMonth,
+    status: 'active',
+    notes: 'Apartado mensual de la hoja original',
+  }));
 }
 
 export function buildDemoIncomes(userId: string, selectedMonth = monthISO()) {

@@ -1,4 +1,4 @@
-import { zodResolver } from '@hookform/resolvers/zod';
+﻿import { zodResolver } from '@hookform/resolvers/zod';
 import { Edit3, Plus, Trash2, Wallet } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { CurrencyInput } from '../../components/forms/CurrencyInput';
 import { Field, SelectInput, TextInput } from '../../components/ui/Form';
 import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
@@ -18,6 +19,7 @@ import type { IncomeSource } from '../../types';
 function IncomeForm({ income, onSubmit, onCancel }: { income: IncomeSource | null; onSubmit: (values: IncomeFormValues) => Promise<void>; onCancel: () => void }) {
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
@@ -44,12 +46,16 @@ function IncomeForm({ income, onSubmit, onCancel }: { income: IncomeSource | nul
           <TextInput placeholder="Salario, extra, bono..." {...register('name')} />
         </Field>
         <Field label="Valor COP" error={errors.amount?.message}>
-          <TextInput type="number" min="0" step="100" {...register('amount')} />
+          <CurrencyInput control={control} name="amount" />
         </Field>
-        <Field label="Tipo" error={errors.income_type?.message}>
+        <Field
+          label="Tipo"
+          error={errors.income_type?.message}
+          helpText="Usa Ya recibido para dinero que ya entró. Usa Por recibir para dinero esperado que todavía no tienes disponible."
+        >
           <SelectInput {...register('income_type')}>
-            <option value="current">Actual</option>
-            <option value="expected">Esperado</option>
+            <option value="current">Ya recibido</option>
+            <option value="expected">Por recibir</option>
           </SelectInput>
         </Field>
         <Field label="Frecuencia" error={errors.frequency?.message}>
@@ -115,15 +121,15 @@ export function IncomesPage() {
               <div key={income.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/55 p-4">
                 <div>
                   <p className="font-semibold text-textPrimary">{income.name}</p>
-                  <p className="text-sm text-textMuted">{income.income_type === 'current' ? 'Actual' : 'Esperado'} · {income.frequency === 'monthly' ? 'Mensual' : 'Único'}</p>
+                  <p className="text-sm text-textMuted">{income.income_type === 'current' ? 'Ya recibido' : 'Por recibir'} · {income.frequency === 'monthly' ? 'Mensual' : 'Único'}</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <p className="text-xl font-bold text-textPrimary">{formatCurrency(income.amount)}</p>
-                  <Button className="h-9 w-9 p-0" variant="ghost" onClick={() => { setEditing(income); setModalOpen(true); }} aria-label="Editar ingreso">
-                    <Edit3 className="h-4 w-4" />
+                  <Button className="h-12 w-12 p-0" variant="secondary" onClick={() => { setEditing(income); setModalOpen(true); }} aria-label="Editar ingreso" title="Editar">
+                    <Edit3 className="h-6 w-6" />
                   </Button>
-                  <Button className="h-9 w-9 p-0" variant="danger" onClick={() => setDeleting(income)} aria-label="Eliminar ingreso">
-                    <Trash2 className="h-4 w-4" />
+                  <Button className="h-12 w-12 p-0" variant="danger" onClick={() => setDeleting(income)} aria-label="Eliminar ingreso" title="Eliminar">
+                    <Trash2 className="h-6 w-6" />
                   </Button>
                 </div>
               </div>
@@ -146,3 +152,4 @@ export function IncomesPage() {
     </div>
   );
 }
+

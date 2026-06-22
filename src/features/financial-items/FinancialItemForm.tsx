@@ -1,7 +1,8 @@
-import { zodResolver } from '@hookform/resolvers/zod';
+﻿import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '../../components/ui/Button';
+import { CurrencyInput } from '../../components/forms/CurrencyInput';
 import { Field, SelectInput, TextAreaInput, TextInput } from '../../components/ui/Form';
 import { financialItemSchema, type FinancialItemFormValues } from '../../lib/validations';
 import type { Category, FinancialItem } from '../../types';
@@ -10,13 +11,15 @@ import { todayISO } from '../../lib/dates';
 type FinancialItemFormProps = {
   categories: Category[];
   item?: FinancialItem | null;
+  initialCategoryId?: string;
   onSubmit: (values: FinancialItemFormValues) => Promise<void>;
   onCancel: () => void;
 };
 
-export function FinancialItemForm({ categories, item, onSubmit, onCancel }: FinancialItemFormProps) {
+export function FinancialItemForm({ categories, item, initialCategoryId, onSubmit, onCancel }: FinancialItemFormProps) {
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
@@ -24,7 +27,7 @@ export function FinancialItemForm({ categories, item, onSubmit, onCancel }: Fina
     resolver: zodResolver(financialItemSchema),
     defaultValues: {
       description: '',
-      category_id: categories[0]?.id ?? '',
+      category_id: initialCategoryId ?? categories[0]?.id ?? '',
       amount: 0,
       due_date: todayISO(),
       frequency: 'monthly',
@@ -37,7 +40,7 @@ export function FinancialItemForm({ categories, item, onSubmit, onCancel }: Fina
   useEffect(() => {
     reset({
       description: item?.description ?? '',
-      category_id: item?.category_id ?? categories[0]?.id ?? '',
+      category_id: item?.category_id ?? initialCategoryId ?? categories[0]?.id ?? '',
       amount: Number(item?.amount ?? 0),
       due_date: item?.due_date ?? todayISO(),
       frequency: item?.frequency ?? 'monthly',
@@ -45,7 +48,7 @@ export function FinancialItemForm({ categories, item, onSubmit, onCancel }: Fina
       notes: item?.notes ?? '',
       is_active: item?.is_active ?? true,
     });
-  }, [categories, item, reset]);
+  }, [categories, initialCategoryId, item, reset]);
 
   return (
     <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
@@ -63,7 +66,7 @@ export function FinancialItemForm({ categories, item, onSubmit, onCancel }: Fina
           </SelectInput>
         </Field>
         <Field label="Valor COP" error={errors.amount?.message}>
-          <TextInput type="number" min="0" step="100" {...register('amount')} />
+          <CurrencyInput control={control} name="amount" />
         </Field>
         <Field label="Fecha de pago" error={errors.due_date?.message}>
           <TextInput type="date" {...register('due_date')} />
@@ -102,3 +105,4 @@ export function FinancialItemForm({ categories, item, onSubmit, onCancel }: Fina
     </form>
   );
 }
+

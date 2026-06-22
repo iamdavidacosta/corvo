@@ -5,7 +5,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { BrandSolo } from './BrandMark';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../features/auth/AuthProvider';
-import { monthISO } from '../../lib/dates';
+import { monthISO, readableDate, salaryCycleForMonth } from '../../lib/dates';
 import { bottomNavItems, navItems } from './navigation';
 
 type AppLayoutProps = {
@@ -43,13 +43,14 @@ export function AppLayout({ selectedMonth, onMonthChange }: AppLayoutProps) {
   const monthInput = format(parseISO(selectedMonth), 'yyyy-MM');
   const displayName = profile?.full_name || user?.email?.split('@')[0] || 'Usuario';
   const initials = displayName.slice(0, 2).toUpperCase();
+  const period = salaryCycleForMonth(selectedMonth, profile?.salary_cycle_day ?? 1, profile?.salary_adjusts_to_business_day ?? true);
 
   const handleMonthChange = (value: string) => {
     onMonthChange(monthISO(parseISO(`${value}-01`)));
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20 lg:pb-0 lg:pl-64">
+    <div className="min-h-screen bg-background pb-28 lg:pb-0 lg:pl-64">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-border bg-surface/95 px-4 py-5 backdrop-blur lg:block">
         <div className="mb-8 px-1">
           <BrandSolo variant="header" />
@@ -59,13 +60,16 @@ export function AppLayout({ selectedMonth, onMonthChange }: AppLayoutProps) {
 
       <header className="sticky top-0 z-30 hidden border-b border-border bg-background/86 backdrop-blur lg:block">
         <div className="mx-auto flex max-w-[1440px] items-center justify-end gap-3 px-8 py-3">
-          <input
-            className="nexo-input h-10 w-40"
-            aria-label="Mes activo"
-            type="month"
-            value={monthInput}
-            onChange={(event) => handleMonthChange(event.target.value)}
-          />
+          <div className="grid gap-1">
+            <input
+              className="nexo-input h-10 w-40"
+              aria-label="Periodo activo"
+              type="month"
+              value={monthInput}
+              onChange={(event) => handleMonthChange(event.target.value)}
+            />
+            <p className="text-right text-[10px] font-medium text-textMuted">{readableDate(period.periodStart)} - {readableDate(period.periodEnd)}</p>
+          </div>
           <NavLink
             to="/notifications"
             className="grid h-10 w-10 place-items-center rounded-lg border border-border bg-surfaceElevated text-textSecondary transition hover:border-accent/70 hover:text-textPrimary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
@@ -95,13 +99,16 @@ export function AppLayout({ selectedMonth, onMonthChange }: AppLayoutProps) {
             </Button>
             <BrandSolo variant="mobile" />
           </div>
-          <input
-            className="nexo-input h-10 max-w-36 px-3"
-            aria-label="Mes activo"
-            type="month"
-            value={monthInput}
-            onChange={(event) => handleMonthChange(event.target.value)}
-          />
+          <div className="grid justify-items-end gap-1">
+            <input
+              className="nexo-input h-10 max-w-36 px-3"
+              aria-label="Periodo activo"
+              type="month"
+              value={monthInput}
+              onChange={(event) => handleMonthChange(event.target.value)}
+            />
+            <p className="max-w-36 truncate text-[10px] font-medium text-textMuted">{readableDate(period.periodStart)} - {readableDate(period.periodEnd)}</p>
+          </div>
         </div>
       </header>
 
@@ -126,7 +133,7 @@ export function AppLayout({ selectedMonth, onMonthChange }: AppLayoutProps) {
         <Outlet />
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-30 grid grid-cols-6 border-t border-border bg-surface/95 px-2 py-2 backdrop-blur lg:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-30 grid grid-cols-4 border-t border-border bg-surface/95 px-2 py-2 backdrop-blur lg:hidden">
         {bottomNavItems.map((item) => (
           <NavLink
             key={item.path}

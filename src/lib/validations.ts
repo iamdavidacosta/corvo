@@ -1,4 +1,4 @@
-import { z } from 'zod';
+﻿import { z } from 'zod';
 
 const amountSchema = z.coerce.number({ invalid_type_error: 'Ingresa un valor válido' }).min(0, 'El valor no puede ser negativo');
 
@@ -27,6 +27,16 @@ export const incomeSchema = z.object({
   is_active: z.boolean().default(true),
 });
 
+export const budgetPocketSchema = z.object({
+  name: z.string().min(2, 'El nombre es obligatorio'),
+  category_id: z.string().optional(),
+  allocated_amount: amountSchema.min(1, 'El valor asignado debe ser mayor a cero'),
+  spent_amount: amountSchema.default(0),
+  month: z.string().optional(),
+  status: z.enum(['active', 'paused', 'closed']).default('active'),
+  notes: z.string().optional(),
+});
+
 export const creditCardSchema = z.object({
   name: z.string().min(2, 'El nombre de la tarjeta es obligatorio'),
   bank: z.string().optional(),
@@ -42,6 +52,8 @@ export const profileSchema = z.object({
   notification_days_before: z.coerce.number().int().min(1).max(15),
   preferred_notification_time: z.string().min(1),
   notifications_enabled: z.boolean().default(true),
+  salary_cycle_day: z.coerce.number().int().min(1).max(31).default(1),
+  salary_adjusts_to_business_day: z.boolean().default(true),
 });
 
 export const monthlySettingSchema = z.object({
@@ -58,7 +70,12 @@ export const categorySchema = z.object({
 
 export type FinancialItemFormValues = z.infer<typeof financialItemSchema>;
 export type IncomeFormValues = z.infer<typeof incomeSchema>;
+export type BudgetPocketFormValues = z.infer<typeof budgetPocketSchema>;
 export type CreditCardFormValues = z.infer<typeof creditCardSchema>;
 export type ProfileFormValues = z.infer<typeof profileSchema>;
 export type MonthlySettingFormValues = z.infer<typeof monthlySettingSchema>;
 export type CategoryFormValues = z.infer<typeof categorySchema>;
+
+
+
+

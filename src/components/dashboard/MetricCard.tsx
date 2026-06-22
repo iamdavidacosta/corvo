@@ -1,7 +1,20 @@
 import type { ReactNode } from 'react';
 import { formatCurrency } from '../../lib/formatters';
+import { HelpMark } from '../ui/HelpMark';
 
-export function MetricCard({ label, value, tone = 'blue', icon }: { label: string; value: number; tone?: 'blue' | 'green' | 'yellow' | 'red'; icon?: ReactNode }) {
+export function MetricCard({
+  label,
+  value,
+  tone = 'blue',
+  icon,
+  helpText,
+}: {
+  label: string;
+  value: number;
+  tone?: 'blue' | 'green' | 'yellow' | 'red';
+  icon?: ReactNode;
+  helpText?: string;
+}) {
   const tones = {
     blue: 'text-accent',
     green: 'text-success',
@@ -13,7 +26,10 @@ export function MetricCard({ label, value, tone = 'blue', icon }: { label: strin
   return (
     <div className="nexo-card overflow-hidden p-5">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-textMuted">{label}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-textMuted">{label}</p>
+          {helpText && <HelpMark text={helpText} />}
+        </div>
         <div className={`grid h-9 w-9 place-items-center rounded-lg bg-deepBlue/80 ${tones[tone]}`}>{icon}</div>
       </div>
       <p className="mt-4 text-2xl font-bold text-textPrimary">{formatCurrency(value)}</p>

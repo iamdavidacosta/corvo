@@ -1,4 +1,4 @@
-import { zodResolver } from '@hookform/resolvers/zod';
+﻿import { zodResolver } from '@hookform/resolvers/zod';
 import { CreditCard as CreditCardIcon, Edit3, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { CurrencyInput } from '../../components/forms/CurrencyInput';
 import { Field, SelectInput, TextAreaInput, TextInput } from '../../components/ui/Form';
 import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
@@ -23,7 +24,7 @@ type CreditCardsPageProps = {
 };
 
 function CardForm({ card, onSubmit, onCancel }: { card: CreditCard | null; onSubmit: (values: CreditCardFormValues) => Promise<void>; onCancel: () => void }) {
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<CreditCardFormValues>({
+  const { register, control, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<CreditCardFormValues>({
     resolver: zodResolver(creditCardSchema),
     defaultValues: { name: '', bank: '', current_amount: 0, payment_date: '', status: 'pending', notes: '' },
   });
@@ -44,7 +45,7 @@ function CardForm({ card, onSubmit, onCancel }: { card: CreditCard | null; onSub
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Nombre" error={errors.name?.message}><TextInput placeholder="Tarjeta principal, compras..." {...register('name')} /></Field>
         <Field label="Banco" error={errors.bank?.message}><TextInput placeholder="Opcional" {...register('bank')} /></Field>
-        <Field label="Valor actual" error={errors.current_amount?.message}><TextInput type="number" min="0" step="100" {...register('current_amount')} /></Field>
+        <Field label="Valor actual" error={errors.current_amount?.message}><CurrencyInput control={control} name="current_amount" /></Field>
         <Field label="Fecha de pago" error={errors.payment_date?.message}><TextInput type="date" {...register('payment_date')} /></Field>
         <Field label="Estado" error={errors.status?.message}>
           <SelectInput {...register('status')}>
@@ -145,3 +146,5 @@ export function CreditCardsPage({ showHeader = true, createRequestId = 0 }: Cred
     </div>
   );
 }
+
+

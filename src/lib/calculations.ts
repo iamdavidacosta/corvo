@@ -1,5 +1,5 @@
 import { isAfter, isBefore, isEqual, parseISO } from 'date-fns';
-import type { FinancialItem, IncomeSource, Payment } from '../types';
+import type { BudgetPocket, FinancialItem, IncomeSource, Payment } from '../types';
 import { daysUntil } from './dates';
 
 export function getTotalDebt(items: FinancialItem[]) {
@@ -46,6 +46,20 @@ export function getExpectedBalanceWithoutDebt(expectedIncome: number, debtTotal:
 
 export function getFreeBalance(balanceWithoutDebt: number, dailyDesignatedMoney: number) {
   return balanceWithoutDebt - dailyDesignatedMoney;
+}
+
+export function getPocketAllocatedTotal(pockets: BudgetPocket[]) {
+  return pockets.filter((pocket) => pocket.status === 'active').reduce((sum, pocket) => sum + Number(pocket.allocated_amount), 0);
+}
+
+export function getPocketSpentTotal(pockets: BudgetPocket[]) {
+  return pockets.filter((pocket) => pocket.status === 'active').reduce((sum, pocket) => sum + Number(pocket.spent_amount), 0);
+}
+
+export function getPocketAvailableTotal(pockets: BudgetPocket[]) {
+  return pockets.filter((pocket) => pocket.status === 'active').reduce((sum, pocket) => {
+    return sum + Math.max(0, Number(pocket.allocated_amount) - Number(pocket.spent_amount));
+  }, 0);
 }
 
 export function groupByCategory(items: FinancialItem[]) {

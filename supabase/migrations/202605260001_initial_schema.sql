@@ -17,6 +17,8 @@ create table if not exists public.profiles (
   notification_days_before integer default 3,
   preferred_notification_time time default '08:00',
   notifications_enabled boolean default true,
+  salary_cycle_day integer default 1 check (salary_cycle_day between 1 and 31),
+  salary_adjusts_to_business_day boolean default true,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -58,6 +60,21 @@ create table if not exists public.income_sources (
   is_active boolean default true,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
+);
+
+create table if not exists public.budget_pockets (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  category_id uuid references public.categories(id) on delete set null,
+  name text not null,
+  allocated_amount numeric(14,2) not null,
+  spent_amount numeric(14,2) default 0,
+  month date not null,
+  status text not null default 'active' check (status in ('active','paused','closed')),
+  notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique (user_id, name, month)
 );
 
 create table if not exists public.credit_cards (
@@ -120,12 +137,14 @@ create table if not exists public.notification_logs (
 );
 
 create index if not exists financial_items_user_due_idx on public.financial_items(user_id, due_date);
+create index if not exists budget_pockets_user_month_idx on public.budget_pockets(user_id, month);
 create index if not exists payments_user_paid_idx on public.payments(user_id, paid_at);
 create index if not exists notification_logs_dedupe_idx on public.notification_logs(user_id, financial_item_id, notification_type, scheduled_for);
 
 create trigger set_profiles_updated_at before update on public.profiles for each row execute function public.set_updated_at();
 create trigger set_financial_items_updated_at before update on public.financial_items for each row execute function public.set_updated_at();
 create trigger set_income_sources_updated_at before update on public.income_sources for each row execute function public.set_updated_at();
+create trigger set_budget_pockets_updated_at before update on public.budget_pockets for each row execute function public.set_updated_at();
 create trigger set_credit_cards_updated_at before update on public.credit_cards for each row execute function public.set_updated_at();
 create trigger set_monthly_settings_updated_at before update on public.monthly_settings for each row execute function public.set_updated_at();
 create trigger set_push_subscriptions_updated_at before update on public.push_subscriptions for each row execute function public.set_updated_at();
@@ -152,6 +171,7 @@ alter table public.profiles enable row level security;
 alter table public.categories enable row level security;
 alter table public.financial_items enable row level security;
 alter table public.income_sources enable row level security;
+alter table public.budget_pockets enable row level security;
 alter table public.credit_cards enable row level security;
 alter table public.payments enable row level security;
 alter table public.monthly_settings enable row level security;
@@ -176,6 +196,11 @@ create policy "income_sources_select_own" on public.income_sources for select us
 create policy "income_sources_insert_own" on public.income_sources for insert with check (user_id = auth.uid());
 create policy "income_sources_update_own" on public.income_sources for update using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy "income_sources_delete_own" on public.income_sources for delete using (user_id = auth.uid());
+
+create policy "budget_pockets_select_own" on public.budget_pockets for select using (user_id = auth.uid());
+create policy "budget_pockets_insert_own" on public.budget_pockets for insert with check (user_id = auth.uid());
+create policy "budget_pockets_update_own" on public.budget_pockets for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy "budget_pockets_delete_own" on public.budget_pockets for delete using (user_id = auth.uid());
 
 create policy "credit_cards_select_own" on public.credit_cards for select using (user_id = auth.uid());
 create policy "credit_cards_insert_own" on public.credit_cards for insert with check (user_id = auth.uid());

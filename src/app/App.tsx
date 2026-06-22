@@ -1,19 +1,19 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { LoginPage, RegisterPage } from '../features/auth/AuthPages';
 import { useAuth } from '../features/auth/AuthProvider';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { FinancialItemsPage } from '../features/financial-items/FinancialItemsPage';
 import { CalendarPage } from '../features/financial-items/CalendarPage';
-import { CreditsPage } from '../features/credits/CreditsPage';
 import { CreditCardsPage } from '../features/credit-cards/CreditCardsPage';
 import { IncomesPage } from '../features/incomes/IncomesPage';
+import { PocketsPage } from '../features/pockets/PocketsPage';
 import { PaidPage } from '../features/payments/PaidPage';
 import { NotificationsPage } from '../features/notifications/NotificationsPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
 import { FinanceProvider } from '../hooks/useFinance';
-import { monthISO } from '../lib/dates';
+import { activeSalaryCycleMonth, monthISO } from '../lib/dates';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
@@ -23,7 +23,20 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export function App() {
+  const { profile } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState(monthISO());
+  const [userSelectedPeriod, setUserSelectedPeriod] = useState(false);
+
+  useEffect(() => {
+    if (userSelectedPeriod) return;
+    const activeMonth = activeSalaryCycleMonth(new Date(), profile?.salary_cycle_day ?? 1, profile?.salary_adjusts_to_business_day ?? true);
+    setSelectedMonth(activeMonth);
+  }, [profile?.salary_adjusts_to_business_day, profile?.salary_cycle_day, userSelectedPeriod]);
+
+  const handleMonthChange = (month: string) => {
+    setUserSelectedPeriod(true);
+    setSelectedMonth(month);
+  };
 
   return (
     <Routes>
@@ -33,7 +46,7 @@ export function App() {
         element={
           <ProtectedRoute>
             <FinanceProvider selectedMonth={selectedMonth}>
-              <AppLayout selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
+              <AppLayout selectedMonth={selectedMonth} onMonthChange={handleMonthChange} />
             </FinanceProvider>
           </ProtectedRoute>
         }
@@ -53,7 +66,7 @@ export function App() {
           }
         />
         <Route path="/incomes" element={<IncomesPage />} />
-        <Route path="/credits" element={<CreditsPage />} />
+        <Route path="/pockets" element={<PocketsPage />} />
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/settings" element={<SettingsPage />} />
 
@@ -62,7 +75,6 @@ export function App() {
         <Route path="/subscriptions" element={<Navigate to="/expenses" replace />} />
         <Route path="/taxes" element={<Navigate to="/expenses" replace />} />
         <Route path="/fixed-costs" element={<Navigate to="/expenses" replace />} />
-        <Route path="/loans" element={<Navigate to="/credits" replace />} />
         <Route path="/credit-cards" element={<CreditCardsPage />} />
         <Route path="/paid" element={<PaidPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />

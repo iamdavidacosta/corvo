@@ -14,23 +14,27 @@ import {
   getExpectedIncome,
   getFreeBalance,
   getOverdueItems,
+  getPocketAllocatedTotal,
   getPendingTotal,
   getTotalDebt,
-  getTotalPaid,
   getUpcomingItems,
 } from '../../lib/calculations';
 import { daysUntil, readableDate } from '../../lib/dates';
 import { formatCurrency } from '../../lib/formatters';
 import { useFinance } from '../../hooks/useFinance';
 import { useToast } from '../../components/ui/Toast';
+import { HelpMark } from '../../components/ui/HelpMark';
 
-function MiniStat({ icon, title, value, subtitle }: { icon: React.ReactNode; title: string; value: string; subtitle: string }) {
+function MiniStat({ icon, title, value, subtitle, helpText }: { icon: React.ReactNode; title: string; value: string; subtitle: string; helpText?: string }) {
   return (
     <div className="nexo-card flex items-center gap-4 p-4">
       <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-accent/12 text-accent">{icon}</div>
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-textPrimary">{value}</p>
-        <p className="text-sm text-textSecondary">{title}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm text-textSecondary">{title}</p>
+          {helpText && <HelpMark text={helpText} />}
+        </div>
         <p className="text-xs text-textMuted">{subtitle}</p>
       </div>
     </div>
@@ -67,22 +71,25 @@ export function DashboardPage() {
   const finance = useFinance();
   const toast = useToast();
   const navigate = useNavigate();
-  const { items, incomes, payments, cards, monthlySetting, loading } = finance;
+  const { items, pockets, incomes, payments, cards, monthlySetting, loading } = finance;
   const currentIncome = getCurrentIncome(incomes);
   const expectedIncome = getExpectedIncome(incomes);
   const debtTotal = getTotalDebt(items);
-  const paidTotal = getTotalPaid(payments);
+  const paidItemsTotal = items.filter((item) => item.status === 'paid').reduce((sum, item) => sum + Number(item.amount), 0);
+  const totalItemsAmount = debtTotal + paidItemsTotal;
+  const pocketAllocated = getPocketAllocatedTotal(pockets);
+  const committedTotal = totalItemsAmount + pocketAllocated;
   const pendingTotal = getPendingTotal(items);
-  const currentBalance = getCurrentBalanceWithoutDebt(currentIncome, debtTotal);
-  const expectedBalance = getExpectedBalanceWithoutDebt(expectedIncome, debtTotal);
+  const currentBalance = getCurrentBalanceWithoutDebt(currentIncome, committedTotal);
+  const expectedBalance = getExpectedBalanceWithoutDebt(expectedIncome, committedTotal);
   const designated = Number(monthlySetting?.daily_designated_money ?? 0);
   const freeCurrent = getFreeBalance(currentBalance, designated);
   const freeExpected = getFreeBalance(expectedBalance, designated);
   const overdue = getOverdueItems(items);
   const upcoming = getUpcomingItems(items, 3);
   const cardsTotal = cards.reduce((sum, card) => sum + Number(card.current_amount), 0);
-  const hasFinancialData = incomes.length > 0 || items.length > 0 || cards.length > 0 || payments.length > 0;
-  const hasChartData = currentIncome > 0 || expectedIncome > 0 || debtTotal > 0;
+  const hasFinancialData = incomes.length > 0 || items.length > 0 || pockets.length > 0 || cards.length > 0 || payments.length > 0;
+  const hasChartData = currentIncome > 0 || expectedIncome > 0 || totalItemsAmount > 0 || pocketAllocated > 0;
 
   const createCategories = async () => {
     await finance.createDefaultCategories();
@@ -117,8 +124,8 @@ export function DashboardPage() {
               step="Paso 2"
               icon={<ReceiptText className="h-5 w-5" />}
               title="Registra tus pagos o deudas"
-              text="Agrega servicios, préstamos, tarjetas o suscripciones."
-              action={<Button className="w-full" variant="secondary" onClick={() => navigate('/credits')}>Agregar deuda o pago</Button>}
+              text="Agrega servicios, préstamos, tarjetas, suscripciones o bolsillos."
+              action={<Button className="w-full" variant="secondary" onClick={() => navigate('/expenses')}>Agregar pago fijo</Button>}
             />
             <OnboardingStep
               step="Paso 3"
@@ -137,22 +144,45 @@ export function DashboardPage() {
     <div className="grid gap-6">
       <PageHeader
         title="Inicio"
-        description="Resumen del mes activo con ingresos, pagos pendientes, vencimientos y saldo disponible."
+        description={`Resumen del periodo activo: ${readableDate(finance.periodStart)} a ${readableDate(finance.periodEnd)}.`}
         action={<Button variant="secondary" icon={<Sparkles className="h-4 w-4" />}>Generar reporte</Button>}
       />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Ingreso actual" value={currentIncome} icon={<TrendingUp className="h-5 w-5" />} />
-        <MetricCard label="Ingreso esperado" value={expectedIncome} icon={<Wallet className="h-5 w-5" />} />
-        <MetricCard label="Total de deudas" value={debtTotal} tone="red" icon={<TrendingDown className="h-5 w-5" />} />
-        <MetricCard label="Saldo libre actual" value={freeCurrent} tone={freeCurrent >= 0 ? 'green' : 'red'} icon={<ReceiptText className="h-5 w-5" />} />
+        <MetricCard
+          label="Ingresos recibidos"
+          value={currentIncome}
+          icon={<TrendingUp className="h-5 w-5" />}
+          helpText="Dinero que ya entró o que ya tienes confirmado este mes."
+        />
+        <MetricCard
+          label="Ingresos por recibir"
+          value={expectedIncome}
+          icon={<Wallet className="h-5 w-5" />}
+          helpText="Dinero que esperas recibir después, pero que todavía no está disponible."
+        />
+        <MetricCard label="Pagos fijos pendientes" value={debtTotal} tone="red" icon={<TrendingDown className="h-5 w-5" />} />
+        <MetricCard
+          label="Saldo disponible hoy"
+          value={freeCurrent}
+          tone={freeCurrent >= 0 ? 'green' : 'red'}
+          icon={<ReceiptText className="h-5 w-5" />}
+          helpText="Ingresos recibidos menos pagos fijos, bolsillos y dinero apartado del mes."
+        />
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MiniStat icon={<CheckCircle2 className="h-6 w-6" />} title="Total pagado" value={formatCurrency(paidTotal)} subtitle={`${payments.length} pagos registrados`} />
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <MiniStat icon={<CheckCircle2 className="h-6 w-6" />} title="Total pagado" value={formatCurrency(paidItemsTotal)} subtitle={`${items.filter((item) => item.status === 'paid').length} pagos registrados`} />
         <MiniStat icon={<AlertTriangle className="h-6 w-6" />} title="Total pendiente" value={formatCurrency(pendingTotal)} subtitle={`${upcoming.length} vencen pronto`} />
         <MiniStat icon={<CreditCard className="h-6 w-6" />} title="Tarjetas de crédito" value={formatCurrency(cardsTotal)} subtitle={`${cards.length} productos`} />
-        <MiniStat icon={<Wallet className="h-6 w-6" />} title="Saldo libre esperado" value={formatCurrency(freeExpected)} subtitle={`Base ${formatCurrency(expectedBalance)}`} />
+        <MiniStat icon={<Wallet className="h-6 w-6" />} title="Apartado en bolsillos" value={formatCurrency(pocketAllocated)} subtitle="Se descuenta del saldo libre" />
+        <MiniStat
+          icon={<Wallet className="h-6 w-6" />}
+          title="Disponible si recibes todo"
+          value={formatCurrency(freeExpected)}
+          subtitle={`Por recibir menos pagos y bolsillos: ${formatCurrency(expectedBalance)}`}
+          helpText="Escenario proyectado usando los ingresos marcados como por recibir."
+        />
       </section>
 
       <section className="grid gap-5 xl:grid-cols-2">
@@ -163,9 +193,9 @@ export function DashboardPage() {
             <EmptyState title="Sin deudas para graficar" description="Cuando registres pagos o deudas, verás su distribución por categoría." />
           )}
         </Card>
-        <Card title="Ingresos vs deudas" subtitle="Comparativo actual y esperado">
+        <Card title="Ingresos vs pagos fijos" subtitle="Recibidos, por recibir y compromisos del mes">
           {hasChartData ? (
-            <IncomeDebtChart currentIncome={currentIncome} expectedIncome={expectedIncome} debtTotal={debtTotal} />
+            <IncomeDebtChart currentIncome={currentIncome} expectedIncome={expectedIncome} committedTotal={committedTotal} />
           ) : (
             <EmptyState title="Aún no hay datos comparables" description="Agrega ingresos o deudas para generar esta gráfica." />
           )}

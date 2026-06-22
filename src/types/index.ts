@@ -1,6 +1,7 @@
 export type Frequency = 'one_time' | 'monthly' | 'yearly';
 export type ItemStatus = 'pending' | 'paid' | 'overdue' | 'inactive';
 export type IncomeType = 'current' | 'expected';
+export type PocketStatus = 'active' | 'paused' | 'closed';
 
 export type Profile = {
   id: string;
@@ -9,6 +10,8 @@ export type Profile = {
   notification_days_before: number;
   preferred_notification_time: string;
   notifications_enabled?: boolean;
+  salary_cycle_day: number;
+  salary_adjusts_to_business_day: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -65,6 +68,21 @@ export type CreditCard = {
   updated_at: string;
 };
 
+export type BudgetPocket = {
+  id: string;
+  user_id: string;
+  category_id: string | null;
+  name: string;
+  allocated_amount: number;
+  spent_amount: number;
+  month: string;
+  status: PocketStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  categories?: Category | null;
+};
+
 export type Payment = {
   id: string;
   user_id: string;
@@ -114,8 +132,12 @@ export type PushSubscriptionRow = {
 export type FinanceData = {
   categories: Category[];
   items: FinancialItem[];
+  pockets: BudgetPocket[];
   incomes: IncomeSource[];
   cards: CreditCard[];
   payments: Payment[];
   monthlySetting: MonthlySetting | null;
+  periodStart: string;
+  periodEnd: string;
+  nextPaymentDate: string;
 };
