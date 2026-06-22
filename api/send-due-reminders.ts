@@ -1,5 +1,5 @@
 import webpush from 'web-push';
-import { addDaysISO, configureWebPush, getServerSupabase, type ApiRequest, type ApiResponse } from './_shared';
+import { addDaysISO, configureWebPush, getServerSupabase, recurringDateInPeriod, type ApiRequest, type ApiResponse } from './_shared';
 
 type Profile = {
   id: string;
@@ -14,6 +14,7 @@ type FinancialItem = {
   description: string;
   amount: number;
   due_date: string;
+  frequency: string;
 };
 
 type PushRow = {
@@ -44,15 +45,19 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const scheduledFor = addDaysISO(new Date(), profile.notification_days_before ?? 3);
       const { data: items, error: itemsError } = await supabase
         .from('financial_items')
-        .select('id, user_id, description, amount, due_date')
+        .select('id, user_id, description, amount, due_date, frequency')
         .eq('user_id', profile.id)
-        .eq('due_date', scheduledFor)
+        .lte('due_date', scheduledFor)
         .eq('is_active', true)
         .neq('status', 'paid')
         .neq('status', 'inactive');
       if (itemsError) throw itemsError;
 
-      for (const item of (items ?? []) as FinancialItem[]) {
+      const dueItems = ((items ?? []) as FinancialItem[]).filter(
+        (item) => recurringDateInPeriod(item.due_date, item.frequency, scheduledFor, scheduledFor) === scheduledFor,
+      );
+
+      for (const item of dueItems) {
         const { data: existingLog } = await supabase
           .from('notification_logs')
           .select('id')
@@ -77,7 +82,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         for (const subscription of (subscriptions ?? []) as PushRow[]) {
           const payload = JSON.stringify({
             title: 'Pago próximo en Corvo',
-            body: `${item.description} vence el ${item.due_date}.`,
+            body: `${item.description} vence el ${scheduledFor}.`,
             url: '/calendar',
           });
 

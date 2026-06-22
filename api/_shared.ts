@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { addMonths, addYears, format, parseISO } from 'date-fns';
 import webpush from 'web-push';
 
 export type ApiRequest = {
@@ -31,4 +32,16 @@ export function addDaysISO(date: Date, days: number) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
   return next.toISOString().slice(0, 10);
+}
+
+export function recurringDateInPeriod(date: string, frequency: string, periodStart: string, periodEnd: string) {
+  if (frequency === 'one_time') return date >= periodStart && date <= periodEnd ? date : null;
+
+  let occurrence = date;
+  while (occurrence < periodStart) {
+    const parsed = parseISO(occurrence);
+    occurrence = format(frequency === 'yearly' ? addYears(parsed, 1) : addMonths(parsed, 1), 'yyyy-MM-dd');
+  }
+
+  return occurrence <= periodEnd ? occurrence : null;
 }

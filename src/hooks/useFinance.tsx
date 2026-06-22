@@ -1,7 +1,7 @@
 ﻿import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { addDays, format, parseISO } from 'date-fns';
 import { supabase } from '../lib/supabase';
-import { belongsToPeriod, nextDueDate, salaryCycleForMonth } from '../lib/dates';
+import { belongsToPeriod, nextDueDate, recurringDateInPeriod, salaryCycleForMonth } from '../lib/dates';
 import { buildDemoCards, buildDemoIncomes, buildDemoItems, buildDemoPockets, defaultCategories } from '../lib/demoData';
 import type { BudgetPocket, Category, CreditCard, FinanceData, FinancialItem, IncomeSource, MonthlySetting, Payment } from '../types';
 import type { BudgetPocketFormValues, CategoryFormValues, CreditCardFormValues, FinancialItemFormValues, IncomeFormValues, MonthlySettingFormValues } from '../lib/validations';
@@ -59,8 +59,8 @@ export function FinanceProvider({ selectedMonth, children }: { selectedMonth: st
 
     const [categoriesRes, itemsRes, pocketsRes, incomesRes, cardsRes, paymentsRes, settingsRes] = await Promise.all([
       supabase.from('categories').select('*').eq('user_id', user.id).order('name'),
-      supabase.from('financial_items').select('*, categories(*)').eq('user_id', user.id).gte('due_date', periodStart).lte('due_date', periodEnd).order('due_date'),
-      supabase.from('budget_pockets').select('*, categories(*)').eq('user_id', user.id).in('month', periodAnchors).order('name'),
+      supabase.from('financial_items').select('*, categories(*)').eq('user_id', user.id).eq('is_active', true).lte('due_date', periodEnd).order('due_date'),
+      supabase.from('budget_pockets').select('*, categories(*)').eq('user_id', user.id).lte('month', periodStart).order('month', { ascending: false }),
       supabase.from('income_sources').select('*').eq('user_id', user.id).eq('is_active', true).order('name'),
       supabase.from('credit_cards').select('*').eq('user_id', user.id).order('payment_date', { nullsFirst: false }),
       supabase.from('payments').select('*, financial_items(*, categories(*))').eq('user_id', user.id).gte('paid_at', periodStart).lt('paid_at', periodEndExclusive).order('paid_at', { ascending: false }),
@@ -71,20 +71,22 @@ export function FinanceProvider({ selectedMonth, children }: { selectedMonth: st
     if (firstError) throw firstError;
 
     const settings = ((settingsRes.data ?? []) as MonthlySetting[]).find((setting) => setting.month === periodStart) ?? ((settingsRes.data ?? []) as MonthlySetting[])[0] ?? null;
-    const pockets = ((pocketsRes.data ?? []) as BudgetPocket[]).reduce<BudgetPocket[]>((acc, pocket) => {
-      const existingIndex = acc.findIndex((item) => item.name === pocket.name);
-      if (existingIndex === -1) return [...acc, pocket];
-      if (pocket.month === periodStart) {
-        const next = [...acc];
-        next[existingIndex] = pocket;
-        return next;
-      }
-      return acc;
-    }, []);
+    const items = ((itemsRes.data ?? []) as FinancialItem[]).flatMap((item) => {
+      const dueDate = recurringDateInPeriod(item.due_date, item.frequency, periodStart, periodEnd);
+      if (!dueDate) return [];
+      return [{ ...item, due_date: dueDate, status: dueDate === item.due_date ? item.status : 'pending' as const }];
+    });
+    const latestPockets = ((pocketsRes.data ?? []) as BudgetPocket[]).reduce<Map<string, BudgetPocket>>((latest, pocket) => {
+      if (!latest.has(pocket.name)) latest.set(pocket.name, pocket);
+      return latest;
+    }, new Map());
+    const pockets = Array.from(latestPockets.values())
+      .filter((pocket) => pocket.status === 'active')
+      .map((pocket) => pocket.month === periodStart ? pocket : { ...pocket, month: periodStart, spent_amount: 0 });
     const incomes = ((incomesRes.data ?? []) as IncomeSource[]).filter((income) => income.frequency === 'monthly' || !income.month || belongsToPeriod(income.month, periodStart, periodEnd));
     setData({
       categories: (categoriesRes.data ?? []) as Category[],
-      items: (itemsRes.data ?? []) as FinancialItem[],
+      items,
       pockets,
       incomes,
       cards: (cardsRes.data ?? []) as CreditCard[],
@@ -181,7 +183,11 @@ export function FinanceProvider({ selectedMonth, children }: { selectedMonth: st
   const deleteBudgetPocket = useCallback(
     async (id: string) => {
       if (!user) return;
-      const { error } = await supabase.from('budget_pockets').delete().eq('id', id).eq('user_id', user.id);
+      const { error } = await supabase
+        .from('budget_pockets')
+        .update({ status: 'closed', updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .eq('user_id', user.id);
       if (error) throw error;
       await refresh();
     },
@@ -379,4 +385,3 @@ export function useFinance() {
   if (!value) throw new Error('useFinance debe usarse dentro de FinanceProvider');
   return value;
 }
-

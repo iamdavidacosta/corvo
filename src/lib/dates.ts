@@ -39,6 +39,17 @@ export function nextDueDate(date: string, frequency: Frequency) {
   return date;
 }
 
+export function recurringDateInPeriod(date: string, frequency: Frequency, periodStart: string, periodEnd: string) {
+  if (frequency === 'one_time') return belongsToPeriod(date, periodStart, periodEnd) ? date : null;
+
+  let occurrence = date;
+  while (occurrence < periodStart) {
+    occurrence = nextDueDate(occurrence, frequency);
+  }
+
+  return occurrence <= periodEnd ? occurrence : null;
+}
+
 export function statusFromDueDate(status: string, dueDate: string) {
   if (status === 'paid' || status === 'inactive') return status;
   return daysUntil(dueDate) < 0 ? 'overdue' : 'pending';
